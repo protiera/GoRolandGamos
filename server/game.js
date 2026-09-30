@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { resolveArtist, findFeat, normalize } from './deezer.js';
+import { resolveArtist, findFeat, normalize, suggestFeats } from './deezer.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const LEAVE_GRACE_MS = 20_000; // délai pour revenir après une déconnexion (refresh, coupure...)
@@ -71,6 +71,7 @@ class Room {
     this.verifying = false;
     this.timeoutPending = false;
     this.winnerId = null;
+    this.missed = null; // réponses possibles sur le dernier artiste, calculées en fin de partie
     this.proposal = null; // artiste de départ en attente de validation : { artist, byId, votes: Set }
     this.log = [];
   }
@@ -255,6 +256,23 @@ class Room {
     this.winnerId = winner?.id || null;
     this.addLog('info', winner ? `${winner.name} remporte la partie !` : 'Partie terminée');
     this.broadcast();
+    this.findMissedAnswers();
+  }
+
+  // Ce qu'on aurait pu répondre sur le dernier artiste de la chaîne
+  async findMissedAnswers() {
+    const chain = this.chain;
+    const last = chain.at(-1)?.artist;
+    if (!last) return;
+    let missed = [];
+    try {
+      missed = await suggestFeats(last, chain.map((c) => c.artist));
+    } catch (err) {
+      console.error('[deezer suggest]', err.message);
+    }
+    if (this.chain !== chain || this.phase !== 'over') return; // nouvelle partie entre-temps
+    this.missed = { artist: last, answers: missed };
+    this.broadcast();
   }
 
   typing(p, text) {
@@ -412,6 +430,7 @@ class Room {
         voterIds: this.voterIds,
       },
       winnerId: this.winnerId,
+      missed: this.missed,
       log: this.log.slice(-20),
     };
   }

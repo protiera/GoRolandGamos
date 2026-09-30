@@ -264,6 +264,23 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .over { text-align: center; padding: 36px 24px; }
 .over .winner { font-family: var(--display); font-weight: 400; font-size: 52px; color: var(--yellow); margin: 8px 0; }
 .over .btn { margin-top: 20px; }
+.missed { margin: 24px auto 0; max-width: 520px; text-align: left; }
+.missed-title { margin: 0 0 12px; color: var(--muted); font-weight: 600; text-align: center; }
+.missed-title b { color: var(--text); }
+.missed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.missed li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line);
+}
+.missed img, .missed .ph {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+  background: var(--card-2); display: grid; place-items: center;
+}
+.missed .info { min-width: 0; }
+.missed .n { font-weight: 700; }
+.missed .by { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missed a { color: var(--blue-2); text-decoration: none; }
+.missed a:hover { text-decoration: underline; }
 
 .chain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .chain-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; }

@@ -66,8 +66,12 @@ const toArtist = (a) => ({
 export async function searchArtists(query) {
   const q = query.trim();
   if (!q) return [];
-  const data = await get(`/search/artist?q=${encodeURIComponent(q)}&limit=8`);
-  return (data.data || []).map(toArtist);
+  // On récupère plus de résultats que nécessaire pour garder les 8 plus populaires
+  const data = await get(`/search/artist?q=${encodeURIComponent(q)}&limit=20`);
+  return (data.data || [])
+    .map(toArtist)
+    .sort((a, b) => (b.fans ?? 0) - (a.fans ?? 0))
+    .slice(0, 8);
 }
 
 // Résout ce que le joueur a saisi : un id (choisi dans l'autocomplétion) ou du texte libre.
@@ -103,9 +107,14 @@ function titleMentions(title, name) {
   return n.length > 0 && t.includes(` ${n} `);
 }
 
+// Titre affiché sans les artistes en feat, pour ne pas souffler de réponses :
+// "Pinocchio (feat. Damso & Gato)" -> "Pinocchio"
+const FEAT_PART_RE = /\s*[([](?:feat\.?|ft\.?|featuring|with|avec)\s[^)\]]*[)\]]|\s+(?:feat\.?|ft\.?|featuring)\s.*$/gi;
+export const cleanTitle = (title = '') => title.replace(FEAT_PART_RE, '').trim() || title;
+
 const toTrack = (t) => ({
   id: t.id,
-  title: t.title,
+  title: cleanTitle(t.title),
   artist: t.artist?.name,
   preview: t.preview || null,
   cover: t.album?.cover_medium || null,
@@ -155,4 +164,33 @@ export async function findFeat(a, b) {
   const track = found ? toTrack(found) : null;
   featCache.set(key, { at: Date.now(), track });
   return track;
+}
+
+// Quelques artistes qui ont un feat avec `artist` (hors artistes exclus), les plus populaires d'abord.
+// Sert à montrer en fin de partie ce qu'on aurait pu répondre.
+export async function suggestFeats(artist, excluded = [], count = 3) {
+  const isExcluded = (c) =>
+    c.id === artist.id ||
+    normalize(c.name) === normalize(artist.name) ||
+    excluded.some((e) => e.id === c.id || normalize(e.name) === normalize(c.name));
+
+  const top = await get(`/artist/${artist.id}/top?limit=100`);
+  const candidates = new Map();
+  for (const t of top.data || []) {
+    for (const c of t.contributors || []) {
+      if (!isExcluded(c) && !candidates.has(c.id)) candidates.set(c.id, toTrack(t));
+    }
+  }
+
+  const found = await Promise.all(
+    [...candidates].slice(0, 15).map(([id, track]) =>
+      get(`/artist/${id}`)
+        .then((a) => ({ artist: toArtist(a), track }))
+        .catch(() => null)
+    )
+  );
+  return found
+    .filter(Boolean)
+    .sort((a, b) => (b.artist.fans ?? 0) - (a.artist.fans ?? 0))
+    .slice(0, count);
 }

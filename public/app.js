@@ -339,6 +339,27 @@ $('promptArtist').addEventListener('click', (e) => {
   socket.emit('game:vote', { accept: btn.dataset.vote === 'yes' }, (res) => res?.error && toast(res.error, 'fail'));
 });
 
+// Fin de partie : quelques réponses qu'on aurait pu donner sur le dernier artiste
+function renderMissed() {
+  const box = $('missed');
+  const last = state.chain.at(-1)?.artist;
+  if (!last || (state.missed && !state.missed.answers.length)) return box.classList.add('hidden');
+  box.classList.remove('hidden');
+  if (!state.missed) {
+    box.innerHTML = `<p class="missed-title">Recherche de réponses possibles avec ${esc(last.name)}…</p>`;
+    return;
+  }
+  const items = state.missed.answers
+    .map(({ artist, track }) => {
+      const pic = artist.picture ? `<img src="${esc(artist.picture)}" alt="">` : '<span class="ph">🎤</span>';
+      const title = esc(track.title);
+      const link = track.link ? `<a href="${esc(track.link)}" target="_blank" rel="noopener">${title}</a>` : title;
+      return `<li>${pic}<div class="info"><div class="n">${esc(artist.name)}</div><div class="by">🎵 ${link}</div></div></li>`;
+    })
+    .join('');
+  box.innerHTML = `<p class="missed-title">Réponses possibles après <b>${esc(state.missed.artist.name)}</b> :</p><ul>${items}</ul>`;
+}
+
 function setFeedback(text, type = 'info') {
   $('feedback').textContent = text;
   $('feedback').className = `feedback ${type}`;
@@ -391,6 +412,7 @@ function renderGame() {
     const winner = playerById(state.winnerId);
     $('winnerText').textContent = winner ? (winner.id === myId ? 'Tu as gagné ! 🏆' : `${winner.name} gagne ! 🏆`) : 'Partie terminée';
     $('overStats').textContent = `${state.chain.length} artiste${state.chain.length > 1 ? 's' : ''} dans la chaîne`;
+    renderMissed();
     const isHost = state.hostId === myId;
     $('lobbyBtn').classList.toggle('hidden', !isHost);
     $('overHint').textContent = isHost ? '' : "En attente de l'hôte pour une nouvelle partie…";
