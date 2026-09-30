@@ -71,6 +71,7 @@ class Room {
     this.verifying = false;
     this.timeoutPending = false;
     this.winnerId = null;
+    this.proposal = null; // artiste de départ en attente de validation : { artist, byId, votes: Set }
     this.log = [];
   }
 
@@ -137,6 +138,7 @@ class Room {
       this.addLog('fail', `${p.name} a quitté la partie`);
       if (wasCurrent && !this.verifying) this.advance();
       else if (this.alivePlayers.length <= 1) this.endGame();
+      else this.checkProposal();
     }
     if (this.phase === 'lobby') this.players = this.players.filter((x) => x !== p);
     if (this.hostId === p.id) this.transferHost();
@@ -201,10 +203,17 @@ class Room {
     clearTimeout(this.timer);
     this.turnToken++;
     this.timeoutPending = false;
+    this.proposal = null;
+    this.io.to(this.channel).emit('game:typing', { text: '' });
+    if (!this.chain.length) {
+      // Artiste de départ : pas de timer, la proposition sera soumise au vote
+      this.turnEndsAt = null;
+      this.broadcast();
+      return;
+    }
     const ms = this.settings.turnTime * 1000;
     this.turnEndsAt = Date.now() + ms;
     this.timer = setTimeout(() => this.onTimeout(), ms + 250);
-    this.io.to(this.channel).emit('game:typing', { text: '' });
     this.broadcast();
   }
 
@@ -257,7 +266,8 @@ class Room {
     if (this.phase !== 'playing') return { error: 'Pas de partie en cours' };
     if (this.currentPlayer !== p) return { error: "Ce n'est pas ton tour" };
     if (this.verifying) return { error: 'Vérification en cours…' };
-    if (Date.now() > this.turnEndsAt + 250) return { error: 'Temps écoulé' };
+    if (this.proposal) return { error: 'Ta proposition est en attente de validation' };
+    if (this.turnEndsAt && Date.now() > this.turnEndsAt + 250) return { error: 'Temps écoulé' };
 
     const token = this.turnToken;
     this.verifying = true;
@@ -282,6 +292,14 @@ class Room {
       if (already) return reject(`${artist.name} a déjà été cité !`);
 
       const prev = this.chain.at(-1)?.artist;
+      if (!prev) {
+        this.verifying = false;
+        this.proposal = { artist, byId: p.id, votes: new Set() };
+        this.addLog('info', `${p.name} propose ${artist.name} comme artiste de départ`);
+        this.broadcast();
+        this.checkProposal();
+        return { ok: true, pending: true };
+      }
       let track = null;
       if (prev) {
         track = await findFeat(prev, artist);
@@ -295,10 +313,7 @@ class Room {
 
       this.chain.push({ artist, byId: p.id, byName: p.name, track });
       this.verifying = false;
-      this.addLog(
-        'ok',
-        prev ? `${p.name} : ${prev.name} × ${artist.name} (${track.title})` : `${p.name} lance avec ${artist.name}`
-      );
+      this.addLog('ok', `${p.name} : ${prev.name} × ${artist.name} (${track.title})`);
       this.io.to(this.channel).emit('game:feat', { artist, track, byName: p.name });
       this.advance();
       return { ok: true };
@@ -307,7 +322,7 @@ class Room {
       if (token !== this.turnToken) return { error: 'Tour terminé' };
       this.verifying = false;
       // Erreur côté Deezer : on ne pénalise pas, on laisse 10 s de plus si le temps était écoulé
-      if (this.timeoutPending || Date.now() > this.turnEndsAt - 10_000) {
+      if (this.turnEndsAt && (this.timeoutPending || Date.now() > this.turnEndsAt - 10_000)) {
         this.timeoutPending = false;
         clearTimeout(this.timer);
         this.turnEndsAt = Date.now() + 10_000;
@@ -316,6 +331,51 @@ class Room {
       this.broadcast();
       return { error: 'Deezer ne répond pas, réessaie' };
     }
+  }
+
+  // ---------- Vote sur l'artiste de départ ----------
+
+  // Joueurs devant valider : tous les joueurs encore en jeu, sauf celui qui propose
+  get voterIds() {
+    if (!this.proposal) return [];
+    return this.alivePlayers.filter((x) => x.id !== this.proposal.byId).map((x) => x.id);
+  }
+
+  vote(p, accept) {
+    const proposal = this.proposal;
+    if (this.phase !== 'playing' || !proposal) return { error: 'Aucune proposition en cours' };
+    if (!this.voterIds.includes(p.id)) return { error: 'Tu ne votes pas sur cette proposition' };
+    const proposer = this.getPlayer(proposal.byId);
+
+    if (!accept) {
+      this.proposal = null;
+      this.addLog('fail', `${p.name} refuse ${proposal.artist.name} comme artiste de départ`);
+      this.io.to(this.channel).emit('game:proposalRejected', {
+        artist: proposal.artist.name,
+        byName: p.name,
+        proposerId: proposer?.id,
+      });
+      this.broadcast();
+      return { ok: true };
+    }
+
+    proposal.votes.add(p.id);
+    this.broadcast();
+    this.checkProposal();
+    return { ok: true };
+  }
+
+  checkProposal() {
+    const proposal = this.proposal;
+    if (this.phase !== 'playing' || !proposal) return;
+    if (!this.voterIds.every((id) => proposal.votes.has(id))) return;
+
+    const proposer = this.getPlayer(proposal.byId);
+    this.proposal = null;
+    this.chain.push({ artist: proposal.artist, byId: proposal.byId, byName: proposer?.name || '?', track: null });
+    this.addLog('ok', `${proposal.artist.name} validé comme artiste de départ`);
+    this.io.to(this.channel).emit('game:feat', { artist: proposal.artist, track: null, byName: proposer?.name || '?' });
+    this.advance();
   }
 
   // ---------- Diffusion ----------
@@ -345,6 +405,12 @@ class Room {
       turnDurationMs: this.settings.turnTime * 1000,
       chain: this.chain,
       verifying: this.verifying,
+      proposal: this.proposal && {
+        artist: this.proposal.artist,
+        byId: this.proposal.byId,
+        votes: [...this.proposal.votes],
+        voterIds: this.voterIds,
+      },
       winnerId: this.winnerId,
       log: this.log.slice(-20),
     };

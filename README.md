@@ -5,7 +5,8 @@ Inspiré de [QuentinAM/roland-gamos](https://github.com/QuentinAM/roland-gamos) 
 
 ## Règles
 
-1. Un joueur (tiré au sort) choisit l'artiste de départ.
+1. Un joueur (tiré au sort) propose l'artiste de départ, sans limite de temps. Tous les autres joueurs doivent
+   le valider : un seul refus et il doit en proposer un autre (sans pénalité).
 2. Chacun son tour, cite un artiste qui a un feat avec le dernier artiste de la chaîne.
 3. Un artiste ne peut être cité qu'une fois (tentative refusée sans pénalité, tu peux réessayer).
 4. Pas de feat trouvé ou temps écoulé : tu perds une vie.

@@ -291,10 +291,11 @@ function renderChain() {
 function renderPrompt() {
   const last = state.chain.at(-1);
   const current = playerById(state.currentPlayerId);
+  if (!last && state.proposal) return renderProposal();
   if (!last) {
     $('promptLabel').textContent = 'Artiste de départ';
     const who = isMyTurn()
-      ? 'Choisis n’importe quel artiste pour lancer la chaîne'
+      ? 'Propose un artiste pour lancer la chaîne. Les autres joueurs devront le valider.'
       : `${esc(current?.name || '…')} choisit l’artiste de départ…`;
     $('promptArtist').innerHTML = `<span class="ph">🎤</span><div class="via">${who}</div>`;
     return;
@@ -304,6 +305,39 @@ function renderPrompt() {
   const via = last.track ? `<div class="via">via <b>${esc(last.track.title)}</b></div>` : '';
   $('promptArtist').innerHTML = `${pic}<div class="aname">${esc(last.artist.name)}</div>${via}`;
 }
+
+// Artiste de départ proposé : tous les autres joueurs doivent le valider
+function renderProposal() {
+  const { artist, byId, votes, voterIds } = state.proposal;
+  const proposer = playerById(byId);
+  const iVote = voterIds.includes(myId) && !votes.includes(myId);
+  $('promptLabel').textContent = 'Artiste de départ proposé';
+  const pic = artist.picture ? `<img src="${esc(artist.picture)}" alt="">` : '<span class="ph">🎤</span>';
+  const fans = artist.fans != null ? `${formatFans(artist.fans)} fans sur Deezer · ` : '';
+  const voters = voterIds
+    .map((id) => `<li class="${votes.includes(id) ? 'yes' : ''}">${votes.includes(id) ? '✅' : '⏳'} ${esc(playerById(id)?.name || '?')}</li>`)
+    .join('');
+  const action = iVote
+    ? `<div class="vote-actions">
+         <button class="btn btn-primary" data-vote="yes">✅ Valider</button>
+         <button class="btn btn-danger" data-vote="no">❌ Refuser</button>
+       </div>`
+    : `<p class="muted small">${byId === myId ? 'En attente de la validation des autres joueurs…' : 'En attente des autres votes…'}</p>`;
+  $('promptArtist').innerHTML = `${pic}<div class="aname">${esc(artist.name)}</div>
+    <div class="via">${fans}proposé par <b>${esc(proposer?.name || '?')}</b></div>
+    <div class="vote">
+      <p class="vote-count">Validations : ${votes.length}/${voterIds.length}</p>
+      <ul class="voters">${voters}</ul>
+      ${action}
+    </div>`;
+}
+
+$('promptArtist').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-vote]');
+  if (!btn) return;
+  $('promptArtist').querySelectorAll('[data-vote]').forEach((b) => (b.disabled = true));
+  socket.emit('game:vote', { accept: btn.dataset.vote === 'yes' }, (res) => res?.error && toast(res.error, 'fail'));
+});
 
 function setFeedback(text, type = 'info') {
   $('feedback').textContent = text;
@@ -328,25 +362,29 @@ function renderGame() {
     .map((l) => `<li class="${l.type}">${esc(l.text)}</li>`).join('');
 
   const banner = $('turnBanner');
-  banner.classList.toggle('mine', mine);
   const me = playerById(myId);
+  const mustVote = !!state.proposal?.voterIds.includes(myId) && !state.proposal.votes.includes(myId);
+  banner.classList.toggle('mine', mine || mustVote);
   banner.textContent = over
     ? 'PARTIE TERMINÉE'
-    : mine
+    : state.proposal
+      ? mustVote ? 'VALIDE OU REFUSE LE DÉPART' : 'VOTE SUR L’ARTISTE DE DÉPART'
+      : mine
       ? 'À TOI DE JOUER !'
       : me && !me.spectator && me.lives <= 0
         ? `Éliminé… au tour de ${current?.name || '…'}`
         : `Au tour de ${current?.name || '…'}`;
 
-  const promptKey = `${state.chain.length}:${state.turn}:${state.phase}`;
+  const p = state.proposal;
+  const promptKey = `${state.chain.length}:${state.turn}:${state.phase}:${p ? `${p.artist.id}-${p.votes.length}-${p.voterIds.length}` : ''}`;
   if (promptKey !== lastPromptKey) {
     renderPrompt();
     renderChain();
     lastPromptKey = promptKey;
   }
 
-  $('timer').classList.toggle('hidden', over);
-  $('answerBox').classList.toggle('hidden', over);
+  $('timer').classList.toggle('hidden', over || state.turnRemainingMs == null);
+  $('answerBox').classList.toggle('hidden', over || !!state.proposal);
   $('overCard').classList.toggle('hidden', !over);
 
   if (over) {
@@ -524,6 +562,15 @@ socket.on('game:feat', ({ artist, track, byName }) => {
   toast(track ? `✅ ${byName} : ${artist.name} — « ${track.title} »` : `🎤 ${byName} lance avec ${artist.name}`, 'ok');
   animate($('promptCard'), 'flash');
   playPreview(track?.preview);
+});
+
+socket.on('game:proposalRejected', ({ artist, byName, proposerId }) => {
+  if (proposerId === myId) {
+    setFeedback(`${byName} a refusé ${artist}. Propose un autre artiste.`, 'error');
+    setTimeout(() => $('answerInput').select(), 0);
+  } else {
+    toast(`❌ ${byName} a refusé ${artist}`, 'fail');
+  }
 });
 
 socket.on('game:fail', ({ playerId, reason, eliminated }) => {

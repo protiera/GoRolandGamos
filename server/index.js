@@ -77,6 +77,12 @@ io.on('connection', (socket) => {
     ack(await room.submit(player, { artistId, name }));
   });
 
+  socket.on('game:vote', (data, ack) => {
+    ack = safeAck(ack);
+    if (!room || !player) return ack({ error: 'Pas de room' });
+    ack(room.vote(player, data?.accept === true));
+  });
+
   socket.on('artist:search', async (data, ack) => {
     ack = safeAck(ack);
     if (!room) return ack([]);

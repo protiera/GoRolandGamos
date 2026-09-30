@@ -214,6 +214,18 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .prompt-artist .via { font-size: 14px; color: var(--muted); }
 .prompt-artist .via b { color: var(--text); }
 
+.btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
+.btn-danger:hover:not(:disabled) { background: rgba(255, 77, 109, .12); }
+.vote { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.vote-count { margin: 0; font-weight: 700; }
+.voters { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.voters li {
+  font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+}
+.voters li.yes { border-color: var(--green); color: var(--text); }
+.vote-actions { display: flex; gap: 12px; }
+.vote .muted { margin: 0; }
 .timer { display: flex; align-items: center; gap: 14px; }
 .timer-bar { flex: 1; height: 10px; background: var(--card); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
 .timer-fill { height: 100%; width: 100%; background: var(--blue); border-radius: 999px; }
