@@ -55,6 +55,25 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: v
   background: var(--card); border: 1px solid var(--line); color: var(--text);
   width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 16px;
 }
+.volume {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 999px; padding: 0 16px 0 0;
+}
+.volume .icon-btn { border: none; background: transparent; }
+.volume input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 110px; height: 6px; padding: 0; border: none; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(to right, var(--blue) var(--fill, 35%), var(--line) var(--fill, 35%));
+}
+.volume input[type="range"]:focus { box-shadow: none; }
+.volume input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%; background: var(--text); border: none;
+}
+.volume input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--text); border: none;
+}
 
 main { padding: 32px; max-width: 1400px; margin: 0 auto; }
 

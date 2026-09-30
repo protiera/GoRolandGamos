@@ -16,7 +16,10 @@
     <a href="/" class="logo" id="logoLink">ROLAND<span>GAMOS</span></a>
     <div class="topbar-right">
       <span class="room-chip hidden" id="roomChip"></span>
-      <button class="icon-btn" id="muteBtn" title="Son des extraits">🔊</button>
+      <div class="volume">
+        <button class="icon-btn" id="muteBtn" title="Couper / remettre le son des extraits">🔊</button>
+        <input type="range" id="volumeSlider" min="0" max="100" step="5" value="35" aria-label="Volume des extraits">
+      </div>
     </div>
   </header>
 

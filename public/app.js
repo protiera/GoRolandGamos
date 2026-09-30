@@ -81,20 +81,41 @@ const playerById = (id) => state?.players.find((p) => p.id === id);
 // ---------- Son ----------
 
 let audio = null;
+const storedVolume = store.get('localStorage', 'rg_volume');
+let volume = storedVolume !== null && Number.isFinite(Number(storedVolume)) ? Number(storedVolume) : 35; // 0 à 100
+const isSilent = () => muted || volume === 0;
+
 function playPreview(url) {
-  if (muted || !url) return;
+  if (isSilent() || !url) return;
   audio?.pause();
   audio = new Audio(url);
-  audio.volume = 0.35;
+  audio.volume = volume / 100;
   audio.play().catch(() => {});
 }
 function renderMute() {
-  $('muteBtn').textContent = muted ? '🔇' : '🔊';
+  $('muteBtn').textContent = isSilent() ? '🔇' : volume < 50 ? '🔉' : '🔊';
+  $('volumeSlider').value = muted ? 0 : volume;
+  $('volumeSlider').style.setProperty('--fill', `${muted ? 0 : volume}%`);
+  $('volumeSlider').title = `Volume : ${muted ? 0 : volume} %`;
 }
 $('muteBtn').addEventListener('click', () => {
   muted = !muted;
+  // Réactiver le son alors que le curseur est à 0 : on remet un volume audible
+  if (!muted && volume === 0) volume = 35;
   store.set('localStorage', 'rg_muted', muted ? '1' : '0');
+  store.set('localStorage', 'rg_volume', String(volume));
   if (muted) audio?.pause();
+  renderMute();
+});
+$('volumeSlider').addEventListener('input', (e) => {
+  volume = Number(e.target.value);
+  muted = false;
+  store.set('localStorage', 'rg_muted', '0');
+  store.set('localStorage', 'rg_volume', String(volume));
+  if (audio) {
+    audio.volume = volume / 100;
+    if (volume === 0) audio.pause();
+  }
   renderMute();
 });
 renderMute();
