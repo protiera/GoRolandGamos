@@ -84,12 +84,15 @@ let audio = null;
 const storedVolume = store.get('localStorage', 'rg_volume');
 let volume = storedVolume !== null && Number.isFinite(Number(storedVolume)) ? Number(storedVolume) : 35; // 0 à 100
 const isSilent = () => muted || volume === 0;
+// L'oreille perçoit le volume de façon logarithmique : une courbe au carré rend les bas niveaux
+// vraiment faibles (10 % du curseur -> 1 % d'amplitude) tout en gardant 100 % au maximum.
+const gain = () => (volume / 100) ** 2;
 
 function playPreview(url) {
   if (isSilent() || !url) return;
   audio?.pause();
   audio = new Audio(url);
-  audio.volume = volume / 100;
+  audio.volume = gain();
   audio.play().catch(() => {});
 }
 function renderMute() {
@@ -113,7 +116,7 @@ $('volumeSlider').addEventListener('input', (e) => {
   store.set('localStorage', 'rg_muted', '0');
   store.set('localStorage', 'rg_volume', String(volume));
   if (audio) {
-    audio.volume = volume / 100;
+    audio.volume = gain();
     if (volume === 0) audio.pause();
   }
   renderMute();
