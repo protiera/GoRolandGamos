@@ -82,15 +82,23 @@ export async function resolveArtist({ id, name }) {
   if (!name?.trim()) return null;
   const results = await searchArtists(name);
   if (!results.length) return null;
-  const exact = results.find((a) => normalize(a.name) === normalize(name));
-  return exact || results[0];
+  // Parmi les homonymes exacts, on prend le plus populaire (sinon le 1er résultat Deezer)
+  const exact = results
+    .filter((a) => normalize(a.name) === normalize(name))
+    .sort((x, y) => (y.fans ?? 0) - (x.fans ?? 0));
+  return exact[0] || results[0];
 }
 
 const sameArtist = (x, target) =>
   x && (x.id === target.id || normalize(x.name) === normalize(target.name));
 
+// Partie "feat." d'un titre : "Mode Akimbo (feat. Jul)" -> "Jul". On ne cherche le nom que là,
+// sinon un titre comme "Lay Back" validerait un feat avec l'artiste "Lay".
+const FEAT_RE = /\b(?:feat\.?|ft\.?|featuring)\s+([^)\]]+)|[([](?:with|avec)\s+([^)\]]+)/gi;
+
 function titleMentions(title, name) {
-  const t = ` ${normalize(title)} `;
+  const segment = [...title.matchAll(FEAT_RE)].map((m) => m[1] || m[2]).join(' ');
+  const t = ` ${normalize(segment)} `;
   const n = normalize(name);
   return n.length > 0 && t.includes(` ${n} `);
 }
