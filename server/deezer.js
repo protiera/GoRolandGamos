@@ -66,11 +66,19 @@ const toArtist = (a) => ({
 export async function searchArtists(query) {
   const q = query.trim();
   if (!q) return [];
-  // On récupère plus de résultats que nécessaire pour garder les 8 plus populaires
   const data = await get(`/search/artist?q=${encodeURIComponent(q)}&limit=20`);
-  return (data.data || [])
-    .map(toArtist)
-    .sort((a, b) => (b.fans ?? 0) - (a.fans ?? 0))
+
+  // On garde l'ordre de pertinence Deezer, mais les homonymes sont regroupés à la place du
+  // premier d'entre eux et classés par fans : le "vrai" Ninho passe devant ses homonymes obscurs.
+  // On n'en garde que 2 par nom pour ne pas remplir la liste d'artistes inconnus.
+  const groups = new Map();
+  for (const artist of (data.data || []).map(toArtist)) {
+    const key = normalize(artist.name);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(artist);
+  }
+  return [...groups.values()]
+    .flatMap((group) => group.sort((a, b) => (b.fans ?? 0) - (a.fans ?? 0)).slice(0, 2))
     .slice(0, 8);
 }
 
