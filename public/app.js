@@ -424,7 +424,7 @@ function renderGame() {
 
   if (over) {
     const winner = playerById(state.winnerId);
-    $('winnerText').textContent = winner ? (winner.id === myId ? 'Tu gagnes la manche ! 🏆' : `${winner.name} gagne la manche ! 🏆`) : 'Manche terminée';
+    $('winnerText').textContent = winner ? (winner.id === myId ? 'Tu gagnes la manche ! 🏆' : `${winner.name} gagne la manche ! 🏆`) : 'Personne ne gagne la manche';
     $('overStats').textContent = `${state.chain.length} artiste${state.chain.length > 1 ? 's' : ''} dans la chaîne`;
     renderScoreboard();
     renderMissed();

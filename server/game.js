@@ -257,6 +257,13 @@ class Room {
     if (p.lives === 0) this.addLog('fail', `${p.name} est éliminé (${reason})`);
     else this.addLog('fail', `${p.name} perd une vie (${reason})`);
     this.io.to(this.channel).emit('game:fail', { playerId: p.id, reason, eliminated: p.lives === 0 });
+    // Le tour a fait le tour de table sans que personne ne trouve, et l'auteur du dernier artiste
+    // se plante à son tour : plus personne ne peut enchaîner, la manche s'arrête sans vainqueur
+    const last = this.chain.at(-1);
+    if (last && last.byId === p.id) {
+      this.addLog('fail', `Personne n'a trouvé de feat avec ${last.artist.name}`);
+      return this.endGame(null);
+    }
     this.advance();
   }
 
@@ -271,9 +278,8 @@ class Room {
     this.startTurn();
   }
 
-  endGame() {
+  endGame(winner = this.alivePlayers[0]) {
     clearTimeout(this.timer);
-    const [winner] = this.alivePlayers;
     this.phase = 'over';
     this.turnEndsAt = null;
     this.verifying = false;
