@@ -54,6 +54,11 @@ class Room {
     this.phase = 'lobby'; // lobby | playing | over
     this.settings = { turnTime: 30, lives: 1 };
     this.emptySince = null;
+    // La partie dure tant qu'on reste dans le salon : scores cumulés sur toutes les manches
+    this.round = 0;
+    this.scores = new Map(); // secret du joueur -> points (survit aux départs/retours)
+    this.citedIds = new Set(); // artistes cités depuis le début de la partie
+    this.citedNames = new Set();
     this.resetGame();
   }
 
@@ -79,6 +84,24 @@ class Room {
   destroy() {
     clearTimeout(this.timer);
     this.players.forEach((p) => clearTimeout(p.leaveTimer));
+  }
+
+  scoreOf(p) {
+    return this.scores.get(p.secret) || 0;
+  }
+
+  addPoints(p, n) {
+    this.scores.set(p.secret, this.scoreOf(p) + n);
+  }
+
+  // Un artiste jamais cité depuis le début de la partie (toutes manches confondues) rapporte 2 points
+  isNewArtist(artist) {
+    return !this.citedIds.has(artist.id) && !this.citedNames.has(normalize(artist.name));
+  }
+
+  markCited(artist) {
+    this.citedIds.add(artist.id);
+    this.citedNames.add(normalize(artist.name));
   }
 
   getPlayer(id) {
@@ -184,7 +207,8 @@ class Room {
     });
     this.order = shuffle(this.players.map((x) => x.id));
     this.phase = 'playing';
-    this.addLog('info', `La partie commence ! ${this.getPlayer(this.order[0]).name} choisit l'artiste de départ`);
+    this.round++;
+    this.addLog('info', `Manche ${this.round} ! ${this.getPlayer(this.order[0]).name} choisit l'artiste de départ`);
     this.startTurn();
     return { ok: true };
   }
@@ -254,7 +278,7 @@ class Room {
     this.turnEndsAt = null;
     this.verifying = false;
     this.winnerId = winner?.id || null;
-    this.addLog('info', winner ? `${winner.name} remporte la partie !` : 'Partie terminée');
+    this.addLog('info', winner ? `${winner.name} remporte la manche !` : 'Manche terminée');
     this.broadcast();
     this.findMissedAnswers();
   }
@@ -329,10 +353,13 @@ class Room {
         }
       }
 
-      this.chain.push({ artist, byId: p.id, byName: p.name, track });
+      const points = this.isNewArtist(artist) ? 2 : 1;
+      this.markCited(artist);
+      this.addPoints(p, points);
+      this.chain.push({ artist, byId: p.id, byName: p.name, track, points });
       this.verifying = false;
-      this.addLog('ok', `${p.name} : ${prev.name} × ${artist.name} (${track.title})`);
-      this.io.to(this.channel).emit('game:feat', { artist, track, byName: p.name });
+      this.addLog('ok', `${p.name} : ${prev.name} × ${artist.name} (${track.title}) +${points}`);
+      this.io.to(this.channel).emit('game:feat', { artist, track, byName: p.name, points });
       this.advance();
       return { ok: true };
     } catch (err) {
@@ -390,6 +417,7 @@ class Room {
 
     const proposer = this.getPlayer(proposal.byId);
     this.proposal = null;
+    this.markCited(proposal.artist);
     this.chain.push({ artist: proposal.artist, byId: proposal.byId, byName: proposer?.name || '?', track: null });
     this.addLog('ok', `${proposal.artist.name} validé comme artiste de départ`);
     this.io.to(this.channel).emit('game:feat', { artist: proposal.artist, track: null, byName: proposer?.name || '?' });
@@ -409,9 +437,11 @@ class Room {
       hostId: this.hostId,
       phase: this.phase,
       settings: this.settings,
+      round: this.round,
       players: this.players.map((p) => ({
         id: p.id,
         name: p.name,
+        score: this.scoreOf(p),
         lives: p.lives,
         connected: p.connected,
         spectator: p.spectator,

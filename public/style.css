@@ -175,6 +175,7 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .player .pname { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player .tag { font-size: 11px; font-weight: 700; color: var(--muted); margin-left: 6px; }
 .player .lives { font-size: 13px; letter-spacing: 1px; white-space: nowrap; }
+.player .score { font-size: 12px; font-weight: 800; color: var(--yellow); white-space: nowrap; }
 .player.me { border-color: var(--line); }
 .player.offline { opacity: .45; }
 .player.current { border-color: var(--yellow); background: rgba(255, 210, 63, .08); }
@@ -264,6 +265,17 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .over { text-align: center; padding: 36px 24px; }
 .over .winner { font-family: var(--display); font-weight: 400; font-size: 52px; color: var(--yellow); margin: 8px 0; }
 .over .btn { margin-top: 20px; }
+.scoreboard { margin: 24px auto 0; max-width: 360px; text-align: left; }
+.scoreboard ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.scoreboard li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 10px; background: var(--bg); border: 1px solid transparent;
+}
+.scoreboard li.me { border-color: var(--line); }
+.scoreboard .pname { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scoreboard b { color: var(--yellow); white-space: nowrap; }
+.chain-item .pts { font-weight: 800; color: var(--text); }
+.chain-item .pts.new { color: var(--green); }
 .missed { margin: 24px auto 0; max-width: 520px; text-align: left; }
 .missed-title { margin: 0 0 12px; color: var(--muted); font-weight: 600; text-align: center; }
 .missed-title b { color: var(--text); }

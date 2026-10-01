@@ -35,8 +35,8 @@
             <li><b>1</b> Un joueur propose l'artiste de départ, validé par tous les autres.</li>
             <li><b>2</b> Chacun son tour, cite un artiste qui a un feat avec le dernier.</li>
             <li><b>3</b> Un artiste ne peut être cité qu'une seule fois.</li>
-            <li><b>4</b> Mauvaise réponse ou temps écoulé : tu perds une vie.</li>
-            <li><b>5</b> Le dernier en vie gagne.</li>
+            <li><b>4</b> Mauvaise réponse ou temps écoulé : tu perds une vie. Le dernier en vie gagne la manche.</li>
+            <li><b>5</b> Bon feat : 1 point, 2 points si l'artiste n'a jamais été cité depuis le début de la partie. Les points se cumulent tant que vous restez dans le salon.</li>
           </ol>
         </div>
 
@@ -95,7 +95,7 @@
               <select id="livesSelect"></select>
             </label>
           </div>
-          <button class="btn btn-primary btn-lg full" id="startBtn">Lancer la partie</button>
+          <button class="btn btn-primary btn-lg full" id="startBtn">Lancer la manche</button>
           <p class="muted small center" id="startHint"></p>
         </div>
       </div>
@@ -138,8 +138,9 @@
             <p class="kicker">Fin de partie</p>
             <h2 class="winner" id="winnerText"></h2>
             <p class="muted" id="overStats"></p>
+            <div class="scoreboard" id="scoreboard"></div>
             <div class="missed hidden" id="missed"></div>
-            <button class="btn btn-primary btn-lg" id="lobbyBtn">Nouvelle partie</button>
+            <button class="btn btn-primary btn-lg" id="lobbyBtn">Manche suivante</button>
             <p class="muted small" id="overHint"></p>
           </div>
         </div>

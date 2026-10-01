@@ -241,7 +241,8 @@ function playerRow(p, { showLives = false } = {}) {
       ? '<span class="lives">💀</span>'
       : `<span class="lives">${'❤️'.repeat(p.lives)}${'🖤'.repeat(Math.max(0, state.settings.lives - p.lives))}</span>`;
   }
-  return `<li class="${cls}"><span class="avatar">${initial(p.name)}</span><span class="pname">${esc(p.name)}${tags}</span>${lives}</li>`;
+  const score = `<span class="score" title="Points depuis le début de la partie">${p.score} pt${p.score > 1 ? 's' : ''}</span>`;
+  return `<li class="${cls}"><span class="avatar">${initial(p.name)}</span><span class="pname">${esc(p.name)}${tags}</span>${lives}${score}</li>`;
 }
 
 function renderLobby() {
@@ -281,7 +282,8 @@ function renderChain() {
   for (let i = chain.length - 1; i >= 0; i--) {
     const c = chain[i];
     const pic = c.artist.picture ? `<img src="${esc(c.artist.picture)}" alt="">` : '<span class="ph">🎤</span>';
-    html += `<li class="chain-item${i === 0 ? ' start' : ''}">${pic}<div class="info"><div class="n">${esc(c.artist.name)}</div><div class="by">par ${esc(c.byName)}</div></div></li>`;
+    const pts = c.points ? ` · <span class="pts${c.points > 1 ? ' new' : ''}">+${c.points}</span>` : '';
+    html += `<li class="chain-item${i === 0 ? ' start' : ''}">${pic}<div class="info"><div class="n">${esc(c.artist.name)}</div><div class="by">par ${esc(c.byName)}${pts}</div></div></li>`;
     if (i > 0 && c.track) {
       const title = esc(c.track.title);
       const link = c.track.link ? `<a href="${esc(c.track.link)}" target="_blank" rel="noopener" title="${title}">${title}</a>` : title;
@@ -303,7 +305,7 @@ function renderPrompt() {
     $('promptArtist').innerHTML = `<span class="ph">🎤</span><div class="via">${who}</div>`;
     return;
   }
-  $('promptLabel').textContent = state.phase === 'over' ? 'Dernier artiste' : 'Donne un feat avec';
+  $('promptLabel').textContent = state.phase === 'over' ? 'Dernier artiste' : `Manche ${state.round} · Donne un feat avec`;
   const pic = last.artist.picture ? `<img src="${esc(last.artist.picture)}" alt="">` : '<span class="ph">🎤</span>';
   const via = last.track ? `<div class="via">via <b>${esc(last.track.title)}</b></div>` : '';
   $('promptArtist').innerHTML = `${pic}<div class="aname">${esc(last.artist.name)}</div>${via}`;
@@ -363,6 +365,15 @@ function renderMissed() {
   box.innerHTML = `<p class="missed-title">Réponses possibles après <b>${esc(state.missed.artist.name)}</b> :</p><ul>${items}</ul>`;
 }
 
+// Classement cumulé depuis le début de la partie (toutes manches du salon)
+function renderScoreboard() {
+  const ranked = state.players.filter((p) => !p.spectator || p.score > 0).sort((a, b) => b.score - a.score);
+  const medals = ['🥇', '🥈', '🥉'];
+  $('scoreboard').innerHTML = `<p class="missed-title">Classement après ${state.round} manche${state.round > 1 ? 's' : ''}</p><ol>${ranked
+    .map((p, i) => `<li class="${p.id === myId ? 'me' : ''}"><span>${medals[i] || `${i + 1}.`}</span><span class="pname">${esc(p.name)}</span><b>${p.score} pt${p.score > 1 ? 's' : ''}</b></li>`)
+    .join('')}</ol>`;
+}
+
 function setFeedback(text, type = 'info') {
   $('feedback').textContent = text;
   $('feedback').className = `feedback ${type}`;
@@ -390,7 +401,7 @@ function renderGame() {
   const mustVote = !!state.proposal?.voterIds.includes(myId) && !state.proposal.votes.includes(myId);
   banner.classList.toggle('mine', mine || mustVote);
   banner.textContent = over
-    ? 'PARTIE TERMINÉE'
+    ? `MANCHE ${state.round} TERMINÉE`
     : state.proposal
       ? mustVote ? 'VALIDE OU REFUSE LE DÉPART' : 'VOTE SUR L’ARTISTE DE DÉPART'
       : mine
@@ -413,12 +424,13 @@ function renderGame() {
 
   if (over) {
     const winner = playerById(state.winnerId);
-    $('winnerText').textContent = winner ? (winner.id === myId ? 'Tu as gagné ! 🏆' : `${winner.name} gagne ! 🏆`) : 'Partie terminée';
+    $('winnerText').textContent = winner ? (winner.id === myId ? 'Tu gagnes la manche ! 🏆' : `${winner.name} gagne la manche ! 🏆`) : 'Manche terminée';
     $('overStats').textContent = `${state.chain.length} artiste${state.chain.length > 1 ? 's' : ''} dans la chaîne`;
+    renderScoreboard();
     renderMissed();
     const isHost = state.hostId === myId;
     $('lobbyBtn').classList.toggle('hidden', !isHost);
-    $('overHint').textContent = isHost ? '' : "En attente de l'hôte pour une nouvelle partie…";
+    $('overHint').textContent = isHost ? '' : "En attente de l'hôte pour la manche suivante…";
     hideSuggestions();
     return;
   }
@@ -583,8 +595,9 @@ socket.on('game:typing', ({ text }) => {
   if (state && !isMyTurn()) setLiveTyping(text);
 });
 
-socket.on('game:feat', ({ artist, track, byName }) => {
-  toast(track ? `✅ ${byName} : ${artist.name} — « ${track.title} »` : `🎤 ${byName} lance avec ${artist.name}`, 'ok');
+socket.on('game:feat', ({ artist, track, byName, points }) => {
+  const pts = points ? ` (+${points}${points > 1 ? ' nouvel artiste !' : ''})` : '';
+  toast(track ? `✅ ${byName} : ${artist.name} — « ${track.title} »${pts}` : `🎤 ${byName} lance avec ${artist.name}`, 'ok');
   animate($('promptCard'), 'flash');
   playPreview(track?.preview);
 });
